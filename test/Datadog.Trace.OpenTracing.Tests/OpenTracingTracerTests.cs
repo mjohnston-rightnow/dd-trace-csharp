@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Datadog.Trace.Agent;
-using Moq;
 using OpenTracing.Propagation;
 using Xunit;
 
@@ -10,12 +8,11 @@ namespace Datadog.Trace.OpenTracing.Tests
 {
     public class OpenTracingTracerTests
     {
-        private Mock<IAgentWriter> _agentWriter = new Mock<IAgentWriter>();
         private OpenTracingTracer _tracer;
 
         public OpenTracingTracerTests()
         {
-           _tracer = new OpenTracingTracer(_agentWriter.Object);
+           _tracer = new OpenTracingTracer();
         }
 
         [Fact]
@@ -23,11 +20,8 @@ namespace Datadog.Trace.OpenTracing.Tests
         {
             var builder = _tracer.BuildSpan("Op1");
             var span = (OpenTracingSpan)builder.Start();
-#if NETCOREAPP2_0
+
             Assert.Equal("testhost", span.DDSpan.ServiceName);
-#else
-            Assert.Equal("Datadog.Trace.OpenTracing.Tests", span.DDSpan.ServiceName);
-#endif
             Assert.Equal("Op1", span.DDSpan.OperationName);
         }
 
@@ -119,7 +113,7 @@ namespace Datadog.Trace.OpenTracing.Tests
             var span = (OpenTracingSpan)_tracer.BuildSpan("Span").Start();
             var headers = new MockTextMap();
 
-            _tracer.Inject(span.Context, Formats.HttpHeaders, headers);
+            _tracer.Inject(span.Context, BuiltinFormats.HttpHeaders, headers);
 
             Assert.Equal(span.DDSpan.Context.TraceId.ToString(), headers.Get(HttpHeaderNames.HttpHeaderTraceId));
             Assert.Equal(span.DDSpan.Context.SpanId.ToString(), headers.Get(HttpHeaderNames.HttpHeaderParentId));
@@ -134,10 +128,10 @@ namespace Datadog.Trace.OpenTracing.Tests
             headers.Set(HttpHeaderNames.HttpHeaderParentId, parentId.ToString());
             headers.Set(HttpHeaderNames.HttpHeaderTraceId, traceId.ToString());
 
-            var context = (SpanContext)_tracer.Extract(Formats.HttpHeaders, headers);
+            var otSpanContext = (OpenTracingSpanContext)_tracer.Extract(BuiltinFormats.HttpHeaders, headers);
 
-            Assert.Equal(parentId, context.SpanId);
-            Assert.Equal(traceId, context.TraceId);
+            Assert.Equal(parentId, otSpanContext.Context.SpanId);
+            Assert.Equal(traceId, otSpanContext.Context.TraceId);
         }
     }
 }

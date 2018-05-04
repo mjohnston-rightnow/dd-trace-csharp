@@ -3,9 +3,11 @@ using System.Threading.Tasks;
 
 namespace Datadog.Trace.Agent
 {
-    internal interface IAgentWriter
+    public interface IAgentWriter
     {
         void WriteTrace(List<Span> trace);
+
+        Task FlushAsync();
 
         Task FlushAndCloseAsync();
     }

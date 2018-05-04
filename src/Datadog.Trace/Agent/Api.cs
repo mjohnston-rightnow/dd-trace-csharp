@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net.Http;
-using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Datadog.Trace.Logging;
 using MsgPack.Serialization;
@@ -32,7 +30,11 @@ namespace Datadog.Trace.Agent
             };
         }
 
-        public Api(Uri baseEndpoint, DelegatingHandler delegatingHandler = null)
+        public Api(Uri baseEndpoint) : this(baseEndpoint, null)
+        {
+        }
+
+        public Api(Uri baseEndpoint, DelegatingHandler delegatingHandler)
         {
             if (delegatingHandler != null)
             {

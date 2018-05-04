@@ -9,13 +9,13 @@ namespace Datadog.Trace.Tests
 {
     public class TracerTests
     {
-        private Mock<IAgentWriter> _writerMock;
+        private readonly string _defaultServiceName = nameof(TracerTests);
         private Tracer _tracer;
 
         public TracerTests()
         {
-            _writerMock = new Mock<IAgentWriter>();
-            _tracer = new Tracer(_writerMock.Object);
+            var writerMock = new Mock<IAgentWriter>();
+            _tracer = new Tracer(writerMock.Object, _defaultServiceName);
         }
 
         [Fact]
@@ -128,11 +128,7 @@ namespace Datadog.Trace.Tests
         {
             var scope = _tracer.StartActive("Operation");
 
-#if NETCOREAPP2_0
-            Assert.Equal("testhost", scope.Span.ServiceName);
-#else
-            Assert.Equal("Datadog.Trace.Tests", scope.Span.ServiceName);
-#endif
+            Assert.Equal(_defaultServiceName, scope.Span.ServiceName);
         }
 
         [Fact]

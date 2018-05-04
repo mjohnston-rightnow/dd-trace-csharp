@@ -47,8 +47,9 @@ namespace Datadog.Trace
                 {
                     if (_openSpans != 0)
                     {
-                        _log.DebugFormat("Some child spans were not finished before the root. {NumberOfOpenSpans}", _openSpans);
-                        if (_tracer.IsDebugEnabled)
+                        _log.InfoFormat("Some child spans were not finished before the root. {NumberOfOpenSpans}", _openSpans);
+
+                        if (_log.IsDebugEnabled())
                         {
                             foreach (var s in _spans.Where(x => !x.IsFinished))
                             {

@@ -40,7 +40,7 @@ namespace Datadog.Trace.Agent
             }
         }
 
-        private async Task FlushTracesAsync()
+        public async Task FlushAsync()
         {
             var traces = _tracesBuffer.Pop();
             if (traces.Any())
@@ -58,12 +58,12 @@ namespace Datadog.Trace.Agent
                     await Task.WhenAny(Task.Delay(TimeSpan.FromSeconds(1)), _processExit.Task);
                     if (_processExit.Task.IsCompleted)
                     {
-                        await FlushTracesAsync();
+                        await FlushAsync();
                         return;
                     }
                     else
                     {
-                        await FlushTracesAsync();
+                        await FlushAsync();
                     }
                 }
                 catch (Exception ex)

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace Datadog.Trace
 {
@@ -6,9 +7,7 @@ namespace Datadog.Trace
     {
         string DefaultServiceName { get; }
 
-        bool IsDebugEnabled { get; }
-
-        AsyncLocalScopeManager ScopeManager { get; }
+        Span StartSpan(string operationName, SpanContext parentContext, string serviceName, DateTimeOffset? start, bool ignoreActiveSpan);
 
         void Write(List<Span> span);
     }

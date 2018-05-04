@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Datadog.Trace.Logging;
 using OpenTracing;
 
@@ -9,18 +10,20 @@ namespace Datadog.Trace.OpenTracing
     {
         private static ILog _log = LogProvider.For<OpenTracingSpanBuilder>();
 
-        private readonly Tracer _tracer;
+        private readonly OpenTracingTracer _tracer;
         private readonly object _lock = new object();
         private readonly string _operationName;
-        private SpanContext _parent;
+        private OpenTracingSpanContext _parent;
         private DateTimeOffset? _start;
         private Dictionary<string, string> _tags;
         private string _serviceName;
+        private bool _ignoreActiveSpan;
 
-        internal OpenTracingSpanBuilder(Tracer tracer, string operationName)
+        internal OpenTracingSpanBuilder(OpenTracingTracer tracer, string operationName)
         {
             _tracer = tracer;
             _operationName = operationName;
+            _serviceName = tracer.ServiceName;
         }
 
         public ISpanBuilder AddReference(string referenceType, ISpanContext referencedContext)
@@ -29,7 +32,7 @@ namespace Datadog.Trace.OpenTracing
             {
                 if (referenceType == References.ChildOf)
                 {
-                    _parent = referencedContext as SpanContext;
+                    _parent = (OpenTracingSpanContext)referencedContext;
                     return this;
                 }
             }
@@ -42,7 +45,7 @@ namespace Datadog.Trace.OpenTracing
         {
             lock (_lock)
             {
-                _parent = parent.Context as SpanContext;
+                _parent = (OpenTracingSpanContext)parent.Context;
                 return this;
             }
         }
@@ -51,20 +54,14 @@ namespace Datadog.Trace.OpenTracing
         {
             lock (_lock)
             {
-                _parent = parent as SpanContext;
+                _parent = (OpenTracingSpanContext)parent;
                 return this;
             }
         }
 
-        public ISpanBuilder FollowsFrom(ISpan parent)
+        public ISpanBuilder IgnoreActiveSpan()
         {
-            _log.Debug("ISpanBuilder.FollowsFrom is not implemented by Datadog.Trace");
-            return this;
-        }
-
-        public ISpanBuilder FollowsFrom(ISpanContext parent)
-        {
-            _log.Debug("ISpanBuilder.FollowsFrom is not implemented by Datadog.Trace");
+            _ignoreActiveSpan = true;
             return this;
         }
 
@@ -72,7 +69,8 @@ namespace Datadog.Trace.OpenTracing
         {
             lock (_lock)
             {
-                var span = new OpenTracingSpan(_tracer.StartActive(_operationName, _parent, _serviceName, _start));
+                Span parent = GetParent();
+                Span span = _tracer.DatadogTracer.StartSpan(_operationName, parent?.Context, _serviceName, _start, _ignoreActiveSpan);
 
                 if (_tags != null)
                 {
@@ -82,7 +80,25 @@ namespace Datadog.Trace.OpenTracing
                     }
                 }
 
-                return span;
+                return new OpenTracingSpan(span);
+            }
+        }
+
+        public IScope StartActive(bool finishSpanOnDispose)
+        {
+            lock (_lock)
+            {
+                ISpan span = Start();
+
+                if (_tags != null)
+                {
+                    foreach (var pair in _tags)
+                    {
+                        span.SetTag(pair.Key, pair.Value);
+                    }
+                }
+
+                return _tracer.ScopeManager.Activate(span, finishSpanOnDispose);
             }
         }
 
@@ -102,7 +118,7 @@ namespace Datadog.Trace.OpenTracing
 
         public ISpanBuilder WithTag(string key, double value)
         {
-            return WithTag(key, value.ToString());
+            return WithTag(key, value.ToString(CultureInfo.InvariantCulture));
         }
 
         public ISpanBuilder WithTag(string key, int value)
@@ -128,6 +144,18 @@ namespace Datadog.Trace.OpenTracing
                 _tags[key] = value;
                 return this;
             }
+        }
+
+        private Span GetParent()
+        {
+            Span parent = _parent?.Span;
+
+            if (parent == null && !_ignoreActiveSpan)
+            {
+                parent = ((OpenTracingSpan)_tracer.ActiveSpan)?.Span;
+            }
+
+            return parent;
         }
     }
 }

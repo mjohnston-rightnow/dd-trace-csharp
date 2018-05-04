@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Net.Http;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using Datadog.Trace.Agent;
 using Datadog.Trace.Logging;
 
@@ -13,68 +15,74 @@ namespace Datadog.Trace
     {
         private const string UnknownServiceName = "UnknownService";
         private static readonly ILog _log = LogProvider.For<Tracer>();
-        private static Uri _defaultUri = new Uri("http://localhost:8126");
 
+        private static Lazy<Tracer> _defaultInstance;
+        private static Tracer _instance;
+
+        // TODO: IScopeManager
         private AsyncLocalScopeManager _scopeManager;
+
         private string _defaultServiceName;
         private IAgentWriter _agentWriter;
-        private bool _isDebugEnabled;
+
+        public static string DefaultAgentUri => "http://localhost:8126";
 
         static Tracer()
         {
-            Instance = Create();
+            _defaultInstance = new Lazy<Tracer>(LazyThreadSafetyMode.ExecutionAndPublication);
         }
 
-        internal Tracer(IAgentWriter agentWriter, string defaultServiceName = null, bool isDebugEnabled = false)
+        public Tracer()
+            : this(DefaultAgentUri)
         {
-            _isDebugEnabled = isDebugEnabled;
-            _agentWriter = agentWriter;
-            _defaultServiceName = defaultServiceName ?? GetAppDomainFriendlyName() ?? UnknownServiceName;
+        }
 
-            // Register callbacks to make sure we flush the traces before exiting
-            AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
-            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
-            Console.CancelKeyPress += Console_CancelKeyPress;
+        public Tracer(string uri)
+            : this(uri, Assembly.GetEntryAssembly().GetName().Name)
+        {
+        }
+
+        public Tracer(string uri, string defaultServiceName)
+            : this(new AgentWriter(new Api(new Uri(uri))), defaultServiceName)
+        {
+        }
+
+        public Tracer(IAgentWriter agentWriter)
+            : this(agentWriter, Assembly.GetEntryAssembly().GetName().Name)
+        {
+        }
+
+        public Tracer(IAgentWriter agentWriter, string defaultServiceName)
+        {
+            _agentWriter = agentWriter;
+            _defaultServiceName = defaultServiceName;
             _scopeManager = new AsyncLocalScopeManager();
         }
 
         /// <summary>
-        /// Gets or sets the global tracer object
+        /// Gets the global tracer object
         /// </summary>
-        public static Tracer Instance { get; set; }
+        public static Tracer Instance => _instance ?? _defaultInstance.Value;
 
         /// <summary>
         /// Gets the active scope
         /// </summary>
         public Scope ActiveScope => _scopeManager.Active;
 
-        /// <summary>
-        /// Gets a value indicating whether debugging mode is enabled.
-        /// </summary>
-        /// <value><c>true</c> is debugging is enabled, otherwise <c>false</c>.</value>
-        bool IDatadogTracer.IsDebugEnabled => _isDebugEnabled;
-
-        /// <summary>
-        /// Gets the default service name for traces where a service name is not specified.
-        /// </summary>
         string IDatadogTracer.DefaultServiceName => _defaultServiceName;
 
         /// <summary>
-        /// Gets the tracer's scope manager, which determines which span is currently active, if any.
+        /// Writes the specified <see cref="Span"/> collection to the agent writer.
         /// </summary>
-        AsyncLocalScopeManager IDatadogTracer.ScopeManager => _scopeManager;
-
-        /// <summary>
-        /// Create a new Tracer with the given parameters
-        /// </summary>
-        /// <param name="agentEndpoint">The agent endpoint where the traces will be sent (default is http://localhost:8126).</param>
-        /// <param name="defaultServiceName">Default name of the service (default is the name of the executing assembly).</param>
-        /// <param name="isDebugEnabled">Turns on all debug logging (this may have an impact on application performance).</param>
-        /// <returns>The newly created tracer</returns>
-        public static Tracer Create(Uri agentEndpoint = null, string defaultServiceName = null, bool isDebugEnabled = false)
+        /// <param name="trace">The <see cref="Span"/> collection to write.</param>
+        void IDatadogTracer.Write(List<Span> trace)
         {
-            agentEndpoint = agentEndpoint ?? _defaultUri;
-            return Create(agentEndpoint, defaultServiceName, null, isDebugEnabled);
+            _agentWriter.WriteTrace(trace);
+        }
+
+        public static void RegisterInstance(Tracer tracer)
+        {
+            _instance = tracer;
         }
 
         /// <summary>
@@ -129,44 +137,9 @@ namespace Datadog.Trace
         /// Writes the specified <see cref="Span"/> collection to the agent writer.
         /// </summary>
         /// <param name="trace">The <see cref="Span"/> collection to write.</param>
-        void IDatadogTracer.Write(List<Span> trace)
+        public async Task FlushTracesAsync()
         {
-            _agentWriter.WriteTrace(trace);
-        }
-
-        internal static Tracer Create(Uri agentEndpoint, string serviceName, DelegatingHandler delegatingHandler = null, bool isDebugEnabled = false)
-        {
-            var api = new Api(agentEndpoint, delegatingHandler);
-            var agentWriter = new AgentWriter(api);
-            var tracer = new Tracer(agentWriter, serviceName, isDebugEnabled);
-            return tracer;
-        }
-
-        private void CurrentDomain_ProcessExit(object sender, EventArgs e)
-        {
-            _agentWriter.FlushAndCloseAsync().Wait();
-        }
-
-        private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
-        {
-            _agentWriter.FlushAndCloseAsync().Wait();
-        }
-
-        private void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
-        {
-            _agentWriter.FlushAndCloseAsync().Wait();
-        }
-
-        private string GetAppDomainFriendlyName()
-        {
-            try
-            {
-                return AppDomain.CurrentDomain.FriendlyName;
-            }
-            catch
-            {
-                return null;
-            }
+            await _agentWriter.FlushAsync();
         }
     }
 }
