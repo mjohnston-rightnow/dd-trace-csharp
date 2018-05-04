@@ -94,7 +94,6 @@ namespace Datadog.Trace.OpenTracing
 
         public ISpan SetTag(string key, string value)
         {
-            // TODO:bertrand do we want this behavior on the Span object too ?
             if (key == DatadogTags.ResourceName)
             {
                 Span.ResourceName = value;

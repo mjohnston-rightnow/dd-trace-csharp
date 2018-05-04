@@ -18,6 +18,9 @@ namespace Datadog.Trace.OpenTracing
         private Dictionary<string, string> _tags;
         private string _serviceName;
         private bool _ignoreActiveSpan;
+        private string _resourceName;
+        private bool? _error;
+        private string _type;
 
         internal OpenTracingSpanBuilder(OpenTracingTracer tracer, string operationName)
         {
@@ -71,6 +74,21 @@ namespace Datadog.Trace.OpenTracing
             {
                 Span parent = GetParent();
                 Span span = _tracer.DatadogTracer.StartSpan(_operationName, parent?.Context, _serviceName, _start, _ignoreActiveSpan);
+
+                if (_resourceName != null)
+                {
+                    span.ResourceName = _resourceName;
+                }
+
+                if (_error != null)
+                {
+                    span.Error = _error.Value;
+                }
+
+                if (_type != null)
+                {
+                    span.Type = _type;
+                }
 
                 if (_tags != null)
                 {
@@ -133,6 +151,24 @@ namespace Datadog.Trace.OpenTracing
                 if (key == DatadogTags.ServiceName)
                 {
                     _serviceName = value;
+                    return this;
+                }
+
+                if (key == DatadogTags.ResourceName)
+                {
+                    _resourceName = value;
+                    return this;
+                }
+
+                if (key == global::OpenTracing.Tag.Tags.Error.Key)
+                {
+                    _error = value == bool.TrueString;
+                    return this;
+                }
+
+                if (key == DatadogTags.SpanType)
+                {
+                    _type = value;
                     return this;
                 }
 
