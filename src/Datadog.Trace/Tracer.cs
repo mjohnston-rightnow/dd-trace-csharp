@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -38,7 +39,7 @@ namespace Datadog.Trace
         }
 
         public Tracer(string uri)
-            : this(uri, Assembly.GetEntryAssembly().GetName().Name)
+            : this(uri, CreateDefaultServiceName())
         {
         }
 
@@ -48,7 +49,7 @@ namespace Datadog.Trace
         }
 
         public Tracer(IAgentWriter agentWriter)
-            : this(agentWriter, Assembly.GetEntryAssembly().GetName().Name)
+            : this(agentWriter, CreateDefaultServiceName())
         {
         }
 
@@ -83,6 +84,12 @@ namespace Datadog.Trace
         public static void RegisterInstance(Tracer tracer)
         {
             _instance = tracer;
+        }
+
+        private static string CreateDefaultServiceName()
+        {
+            return Assembly.GetEntryAssembly()?.GetName().Name ??
+                   Process.GetCurrentProcess().ProcessName;
         }
 
         /// <summary>
