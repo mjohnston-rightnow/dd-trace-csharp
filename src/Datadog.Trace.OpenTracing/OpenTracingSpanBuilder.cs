@@ -26,7 +26,6 @@ namespace Datadog.Trace.OpenTracing
         {
             _tracer = tracer;
             _operationName = operationName;
-            _serviceName = tracer.ServiceName;
         }
 
         public ISpanBuilder AddReference(string referenceType, ISpanContext referencedContext)
@@ -73,7 +72,12 @@ namespace Datadog.Trace.OpenTracing
             lock (_lock)
             {
                 Span parent = GetParent();
-                Span span = _tracer.DatadogTracer.StartSpan(_operationName, parent?.Context, _serviceName, _start, _ignoreActiveSpan);
+
+                // if service name was not set, inherit parent's service name;
+                // if there is no parent, fallback to default service name
+                string serviceName = _serviceName ?? parent?.ServiceName ?? _tracer.DefaultServiceName;
+
+                Span span = _tracer.DatadogTracer.StartSpan(_operationName, parent?.Context, serviceName, _start, _ignoreActiveSpan);
 
                 if (_resourceName != null)
                 {
@@ -184,14 +188,15 @@ namespace Datadog.Trace.OpenTracing
 
         private Span GetParent()
         {
-            Span parent = _parent?.Span;
+            Span explicitParent = _parent?.Span;
 
-            if (parent == null && !_ignoreActiveSpan)
+            if (explicitParent == null && !_ignoreActiveSpan)
             {
-                parent = ((OpenTracingSpan)_tracer.ActiveSpan)?.Span;
+                // if parent was not set explicitly, default to active span as parent (unless disabled)
+                return _tracer.ActiveSpan?.Span;
             }
 
-            return parent;
+            return explicitParent;
         }
     }
 }

@@ -25,18 +25,20 @@ namespace Datadog.Trace.OpenTracing
         public OpenTracingTracer(IDatadogTracer datadogTracer, IScopeManager scopeManager)
         {
             DatadogTracer = datadogTracer;
-            ServiceName = datadogTracer.DefaultServiceName;
+            DefaultServiceName = datadogTracer.DefaultServiceName;
             ScopeManager = scopeManager;
             _codecs = new Dictionary<string, ICodec> { { BuiltinFormats.HttpHeaders.ToString(), new HttpHeadersCodec() } };
         }
 
         internal IDatadogTracer DatadogTracer { get; }
 
-        public string ServiceName { get; }
+        public string DefaultServiceName { get; }
 
         public IScopeManager ScopeManager { get; }
 
-        public ISpan ActiveSpan => ScopeManager.Active?.Span;
+        public OpenTracingSpan ActiveSpan => (OpenTracingSpan)ScopeManager.Active?.Span;
+
+        ISpan ITracer.ActiveSpan => ScopeManager.Active?.Span;
 
         public ISpanBuilder BuildSpan(string operationName)
         {

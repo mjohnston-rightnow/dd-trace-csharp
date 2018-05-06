@@ -117,14 +117,14 @@ namespace Datadog.Trace.OpenTracing.Tests
         [Fact]
         public void Start_SettingServiceInParent_ChildInheritServiceName()
         {
-            var root = (OpenTracingSpan)_tracer.BuildSpan(null)
+            IScope root = _tracer.BuildSpan(null)
                  .WithTag(DatadogTags.ServiceName, "MyService")
-                 .Start();
-            var child = (OpenTracingSpan)_tracer.BuildSpan(null)
-                 .Start();
+                 .StartActive(finishSpanOnDispose: true);
+            IScope child = _tracer.BuildSpan(null)
+                 .StartActive(finishSpanOnDispose: true);
 
-            Assert.Equal("MyService", root.DDSpan.ServiceName);
-            Assert.Equal("MyService", child.DDSpan.ServiceName);
+            Assert.Equal("MyService", ((OpenTracingSpan)root.Span).Span.ServiceName);
+            Assert.Equal("MyService", ((OpenTracingSpan)child.Span).Span.ServiceName);
         }
 
         [Fact]
