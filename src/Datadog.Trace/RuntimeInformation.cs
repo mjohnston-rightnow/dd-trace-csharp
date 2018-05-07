@@ -1,16 +1,23 @@
 ﻿using System;
 using System.Linq;
+
 #if !NETSTANDARD2_0
 using Microsoft.Win32;
-
 #endif
 
 namespace Datadog.Trace
 {
+    /// <summary>
+    /// Provides helper methods that retrieve information about the current runtime environment.
+    /// </summary>
     public static class RuntimeInformation
     {
 #if NETSTANDARD2_0
-    public static string GetFrameworkVersion()
+        /// <summary>
+        /// Gets the framework version of the current runtime environment.
+        /// </summary>
+        /// <returns>The framework version of the current runtime environment (e.g. "4.5", "4.5.1", "4.6").</returns>
+        public static string GetFrameworkVersion()
         {
             return System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
         }
@@ -18,6 +25,7 @@ namespace Datadog.Trace
         private class KeyVersionPair
         {
             public int Key { get; }
+
             public string Version { get; }
 
             public KeyVersionPair(int key, string version)
@@ -26,6 +34,7 @@ namespace Datadog.Trace
                 Version = version;
             }
         }
+
         private static readonly KeyVersionPair[] Versions =
         {
             new KeyVersionPair(461308, "4.7.1 or later"),
@@ -38,6 +47,10 @@ namespace Datadog.Trace
             new KeyVersionPair(378389, "4.5")
         };
 
+        /// <summary>
+        /// Gets the framework version of the current runtime environment.
+        /// </summary>
+        /// <returns>The framework version of the current runtime environment (e.g. "4.5", "4.5.1", "4.6").</returns>
         public static string GetFrameworkVersion()
         {
             // on the full Framework 4.5+, query the registry to determine the version of the CLR

@@ -26,6 +26,9 @@ namespace Datadog.Trace
         private string _defaultServiceName;
         private IAgentWriter _agentWriter;
 
+        /// <summary>
+        /// The default Datadog Agent URI.
+        /// </summary>
         public static string DefaultAgentUri => "http://localhost:8126";
 
         static Tracer()
@@ -33,26 +36,51 @@ namespace Datadog.Trace
             _defaultInstance = new Lazy<Tracer>(LazyThreadSafetyMode.ExecutionAndPublication);
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Tracer"/> class with default settings.
+        /// </summary>
         public Tracer()
             : this(DefaultAgentUri)
         {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Tracer" /> class with the
+        /// specified Datadog Agent URI.
+        /// </summary>
+        /// <param name="uri">The Datadog Agent URI.</param>
         public Tracer(string uri)
             : this(uri, CreateDefaultServiceName())
         {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Tracer" /> class with the
+        /// specified Datadog Agent URI and default service name.
+        /// </summary>
+        /// <param name="uri">The Datadog Agent URI.</param>
+        /// <param name="defaultServiceName">The default service name.</param>
         public Tracer(string uri, string defaultServiceName)
             : this(new AgentWriter(new Api(new Uri(uri))), defaultServiceName)
         {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Tracer" /> class with the
+        /// specified <see cref="IAgentWriter" />.
+        /// </summary>
+        /// <param name="agentWriter">The writer used to send data to the Datadog Agent.</param>
         public Tracer(IAgentWriter agentWriter)
             : this(agentWriter, CreateDefaultServiceName())
         {
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Tracer" /> class with the
+        /// specified <see cref="IAgentWriter" /> and default service name.
+        /// </summary>
+        /// <param name="agentWriter">The writer used to send data to the Datadog Agent.</param>
+        /// <param name="defaultServiceName">The default service name.</param>
         public Tracer(IAgentWriter agentWriter, string defaultServiceName)
         {
             _agentWriter = agentWriter;
@@ -70,6 +98,19 @@ namespace Datadog.Trace
         /// </summary>
         public Scope ActiveScope => _scopeManager.Active;
 
+        /// <summary>
+        /// Registers the specified <see cref="Tracer" /> instance as the global instance
+        /// that can be accessed through <see cref="Tracer.Instance"/>.
+        /// </summary>
+        /// <param name="tracer">The tracer instance to be registered as the global instance..</param>
+        public static void RegisterInstance(Tracer tracer)
+        {
+            _instance = tracer;
+        }
+
+        /// <summary>
+        /// Gets the default service name for traces where a service name is not specified.
+        /// </summary>
         string IDatadogTracer.DefaultServiceName => _defaultServiceName;
 
         /// <summary>
@@ -79,11 +120,6 @@ namespace Datadog.Trace
         void IDatadogTracer.Write(List<Span> trace)
         {
             _agentWriter.WriteTrace(trace);
-        }
-
-        public static void RegisterInstance(Tracer tracer)
-        {
-            _instance = tracer;
         }
 
         private static string CreateDefaultServiceName()
@@ -141,9 +177,9 @@ namespace Datadog.Trace
         }
 
         /// <summary>
-        /// Writes the specified <see cref="Span"/> collection to the agent writer.
+        /// Sends any pending spans to the Datadog Agent asynchronously.
         /// </summary>
-        /// <param name="trace">The <see cref="Span"/> collection to write.</param>
+        /// <returns>A <see cref="Task"/> representing the asynchronous flush operation.</returns>
         public async Task FlushTracesAsync()
         {
             await _agentWriter.FlushAsync();

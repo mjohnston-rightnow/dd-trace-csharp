@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using System.Net.Http.Headers;
 using OpenTracing.Propagation;
@@ -55,6 +55,10 @@ namespace Datadog.Trace.OpenTracing
             }
         }
 
+        /// <summary>
+        /// Returns an enumerator that iterates through the header collection.
+        /// </summary>
+        /// <returns>An System.Collections.IEnumerator object that can be used to iterate through the header collection.</returns>
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
