@@ -30,16 +30,6 @@ namespace Datadog.Trace.Agent
             }
         }
 
-        public async Task FlushAndCloseAsync()
-        {
-            _processExit.SetResult(true);
-            await Task.WhenAny(_flushTask, Task.Delay(TimeSpan.FromSeconds(2)));
-            if (!_flushTask.IsCompleted)
-            {
-                _log.Warn("Could not flush all traces before process exit");
-            }
-        }
-
         public async Task FlushAsync()
         {
             var traces = _tracesBuffer.Pop();
