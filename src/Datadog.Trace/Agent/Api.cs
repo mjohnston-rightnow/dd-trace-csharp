@@ -64,7 +64,7 @@ namespace Datadog.Trace.Agent
             try
             {
                 var content = new MsgPackContent<T>(value, _serializationContext);
-                var response = await _client.PostAsync(endpoint, content);
+                var response = await _client.PostAsync(endpoint, content).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
             }
             catch (Exception ex)

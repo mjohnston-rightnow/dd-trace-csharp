@@ -23,7 +23,7 @@ namespace Datadog.Trace.Agent
         protected override async Task SerializeToStreamAsync(Stream stream, TransportContext context)
         {
             var serializer = _serializationContext.GetSerializer<T>();
-            await serializer.PackAsync(stream, Value);
+            await serializer.PackAsync(stream, Value).ConfigureAwait(false);
         }
 
         protected override bool TryComputeLength(out long length)

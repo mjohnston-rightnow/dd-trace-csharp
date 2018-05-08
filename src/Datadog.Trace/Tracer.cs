@@ -176,7 +176,7 @@ namespace Datadog.Trace
         /// <returns>A <see cref="Task"/> representing the asynchronous flush operation.</returns>
         public async Task FlushTracesAsync()
         {
-            await _agentWriter.FlushAsync();
+            await _agentWriter.FlushAsync().ConfigureAwait(false);
         }
 
         private static string CreateDefaultServiceName()

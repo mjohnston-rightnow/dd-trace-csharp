@@ -68,8 +68,8 @@ namespace Datadog.Trace.TestHelpers
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            var requestContent = await request.Content.ReadAsByteArrayAsync();
-            var response = await base.SendAsync(request, cancellationToken);
+            var requestContent = await request.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+            var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
             lock (_lock)
             {
                 Requests.Add(Tuple.Create(request, requestContent));

@@ -35,7 +35,7 @@ namespace Datadog.Trace.Agent
             var traces = _tracesBuffer.Pop();
             if (traces.Any())
             {
-                await _api.SendTracesAsync(traces);
+                await _api.SendTracesAsync(traces).ConfigureAwait(false);
             }
         }
 
@@ -45,15 +45,15 @@ namespace Datadog.Trace.Agent
             {
                 try
                 {
-                    await Task.WhenAny(Task.Delay(TimeSpan.FromSeconds(1)), _processExit.Task);
+                    await Task.WhenAny(Task.Delay(TimeSpan.FromSeconds(1)), _processExit.Task).ConfigureAwait(false);
                     if (_processExit.Task.IsCompleted)
                     {
-                        await FlushAsync();
+                        await FlushAsync().ConfigureAwait(false);
                         return;
                     }
                     else
                     {
-                        await FlushAsync();
+                        await FlushAsync().ConfigureAwait(false);
                     }
                 }
                 catch (Exception ex)
