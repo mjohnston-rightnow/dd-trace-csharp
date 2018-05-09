@@ -30,7 +30,7 @@ namespace Datadog.Trace.OpenTracing
             _codecs = new Dictionary<string, ICodec> { { BuiltinFormats.HttpHeaders.ToString(), new HttpHeadersCodec() } };
         }
 
-        internal IDatadogTracer DatadogTracer { get; }
+        public IDatadogTracer DatadogTracer { get; }
 
         public string DefaultServiceName { get; }
 

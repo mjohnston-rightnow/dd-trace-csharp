@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 
 #if !NETSTANDARD2_0
@@ -22,19 +22,6 @@ namespace Datadog.Trace
             return System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
         }
 #else
-        private class KeyVersionPair
-        {
-            public int Key { get; }
-
-            public string Version { get; }
-
-            public KeyVersionPair(int key, string version)
-            {
-                Key = key;
-                Version = version;
-            }
-        }
-
         private static readonly KeyVersionPair[] Versions =
         {
             new KeyVersionPair(461308, "4.7.1 or later"),
@@ -72,6 +59,19 @@ namespace Datadog.Trace
 
                 return ".NET Framework 4.5 or later not detected.";
             }
+        }
+
+        private class KeyVersionPair
+        {
+            public KeyVersionPair(int key, string version)
+            {
+                Key = key;
+                Version = version;
+            }
+
+            public int Key { get; }
+
+            public string Version { get; }
         }
 #endif
     }

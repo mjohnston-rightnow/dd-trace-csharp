@@ -30,7 +30,8 @@ namespace Datadog.Trace.Agent
             };
         }
 
-        public Api(Uri baseEndpoint) : this(baseEndpoint, null)
+        public Api(Uri baseEndpoint)
+            : this(baseEndpoint, null)
         {
         }
 

@@ -1,9 +1,13 @@
+#if NET45
+using System;
+using System.Runtime.Remoting.Messaging;
+#else
+using System.Threading;
+#endif
+
 namespace Datadog.Trace
 {
 #if NET45
-    using System;
-    using System.Runtime.Remoting.Messaging;
-
     // TODO:bertrand revisit this when we want to support multiple AppDomains
     internal class AsyncLocalCompat<T>
     {
@@ -26,8 +30,6 @@ namespace Datadog.Trace
     }
 
 #else
-    using System.Threading;
-
     internal class AsyncLocalCompat<T>
     {
         private AsyncLocal<T> _asyncLocal = new AsyncLocal<T>();

@@ -26,11 +26,6 @@ namespace Datadog.Trace
         private string _defaultServiceName;
         private IAgentWriter _agentWriter;
 
-        /// <summary>
-        /// The default Datadog Agent URI.
-        /// </summary>
-        public static string DefaultAgentUri => "http://localhost:8126";
-
         static Tracer()
         {
             _defaultInstance = new Lazy<Tracer>(LazyThreadSafetyMode.ExecutionAndPublication);
@@ -89,6 +84,11 @@ namespace Datadog.Trace
         }
 
         /// <summary>
+        /// Gets the default Datadog Agent URI.
+        /// </summary>
+        public static string DefaultAgentUri => "http://localhost:8126";
+
+        /// <summary>
         /// Gets the global tracer object
         /// </summary>
         public static Tracer Instance => _instance ?? _defaultInstance.Value;
@@ -97,6 +97,11 @@ namespace Datadog.Trace
         /// Gets the active scope
         /// </summary>
         public Scope ActiveScope => _scopeManager.Active;
+
+        /// <summary>
+        /// Gets the default service name for traces where a service name is not specified.
+        /// </summary>
+        string IDatadogTracer.DefaultServiceName => _defaultServiceName;
 
         /// <summary>
         /// Registers the specified <see cref="Tracer" /> instance as the global instance
@@ -109,23 +114,12 @@ namespace Datadog.Trace
         }
 
         /// <summary>
-        /// Gets the default service name for traces where a service name is not specified.
-        /// </summary>
-        string IDatadogTracer.DefaultServiceName => _defaultServiceName;
-
-        /// <summary>
         /// Writes the specified <see cref="Span"/> collection to the agent writer.
         /// </summary>
         /// <param name="trace">The <see cref="Span"/> collection to write.</param>
         void IDatadogTracer.Write(List<Span> trace)
         {
             _agentWriter.WriteTrace(trace);
-        }
-
-        private static string CreateDefaultServiceName()
-        {
-            return Assembly.GetEntryAssembly()?.GetName().Name ??
-                   Process.GetCurrentProcess().ProcessName;
         }
 
         /// <summary>
@@ -183,6 +177,12 @@ namespace Datadog.Trace
         public async Task FlushTracesAsync()
         {
             await _agentWriter.FlushAsync();
+        }
+
+        private static string CreateDefaultServiceName()
+        {
+            return Assembly.GetEntryAssembly()?.GetName().Name ??
+                   Process.GetCurrentProcess().ProcessName;
         }
     }
 }
