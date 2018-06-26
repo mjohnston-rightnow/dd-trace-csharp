@@ -1,0 +1,14 @@
+﻿{
+  "tracing": {
+    "enabled":  true,
+    "applicationName": "ConsoleApp",
+    "integrations": {
+      "custom": {
+        "enabled": true
+      },
+      "aspNetMvc5": {
+        "enabled": true
+      }
+    }
+  }
+}
