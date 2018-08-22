@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Web;
+using System.Web.Routing;
 using Datadog.Trace.ExtensionMethods;
 
 namespace Datadog.Trace.ClrProfiler.Integrations
@@ -55,8 +56,8 @@ namespace Datadog.Trace.ClrProfiler.Integrations
 
                 // access the controller context without referencing System.Web.Mvc directly
                 dynamic controllerContext = controllerContextObj;
-
                 _httpContext = controllerContext.HttpContext;
+                var routeData = controllerContext.RouteData as RouteData;
 
                 if (_httpContext == null)
                 {
@@ -67,7 +68,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                 string httpMethod = _httpContext.Request.HttpMethod.ToUpperInvariant();
                 string url = _httpContext.Request.RawUrl.ToLowerInvariant();
 
-                IDictionary<string, object> routeValues = controllerContext.RouteData.Values;
+                IDictionary<string, object> routeValues = routeData.Values;
                 string controllerName = routeValues.GetValueOrDefault("controller") as string;
                 string actionName = routeValues.GetValueOrDefault("action") as string;
                 string resourceName = $"{controllerName}.{actionName}";
@@ -79,7 +80,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                 span.SetTag(Tags.HttpRequestHeadersHost, host);
                 span.SetTag(Tags.HttpMethod, httpMethod);
                 span.SetTag(Tags.HttpUrl, url);
-                span.SetTag(Tags.AspNetRoute, (string)controllerContext.RouteData.Route.Url);
+                span.SetTag(Tags.AspNetRoute, ((Route)routeData.Route).Url);
                 span.SetTag(Tags.AspNetController, controllerName);
                 span.SetTag(Tags.AspNetAction, actionName);
             }
