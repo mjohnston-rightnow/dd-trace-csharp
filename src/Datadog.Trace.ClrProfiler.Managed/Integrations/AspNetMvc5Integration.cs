@@ -55,12 +55,16 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                 }
 
                 // access the controller context without referencing System.Web.Mvc directly
+                // TODO: consider emitting IL into a DynamicMethod instead of using "dynamic", it's a little faster
                 dynamic controllerContext = controllerContextObj;
-                _httpContext = controllerContext.HttpContext;
+                _httpContext = controllerContext.HttpContext as HttpContextBase;
                 var routeData = controllerContext.RouteData as RouteData;
 
-                if (_httpContext == null)
+                // if there's no HttpContext, there's nothing for us to do.
+                // if we can't get route data, we can't identify the span.
+                if (_httpContext == null || routeData?.Values == null)
                 {
+                    // TODO: log this
                     return;
                 }
 
@@ -71,16 +75,16 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                 IDictionary<string, object> routeValues = routeData.Values;
                 string controllerName = routeValues.GetValueOrDefault("controller") as string;
                 string actionName = routeValues.GetValueOrDefault("action") as string;
-                string resourceName = $"{controllerName}.{actionName}";
+                string route = ((Route)routeData.Route).Url;
 
                 _scope = Tracer.Instance.StartActive(RequestOperationName);
                 Span span = _scope.Span;
                 span.Type = SpanTypes.Web;
-                span.ResourceName = resourceName;
+                span.ResourceName = $"{controllerName}.{actionName}";
                 span.SetTag(Tags.HttpRequestHeadersHost, host);
                 span.SetTag(Tags.HttpMethod, httpMethod);
                 span.SetTag(Tags.HttpUrl, url);
-                span.SetTag(Tags.AspNetRoute, ((Route)routeData.Route).Url);
+                span.SetTag(Tags.AspNetRoute, route);
                 span.SetTag(Tags.AspNetController, controllerName);
                 span.SetTag(Tags.AspNetAction, actionName);
             }
