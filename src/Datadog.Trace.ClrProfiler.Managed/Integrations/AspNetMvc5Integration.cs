@@ -94,19 +94,20 @@ namespace Datadog.Trace.ClrProfiler.Integrations
         /// <summary>
         /// Wrapper method used to instrument System.Web.Mvc.Async.AsyncControllerActionInvoker.BeginInvokeAction().
         /// </summary>
-        /// <param name="asyncControllerActionInvoker">The AsyncControllerActionInvoker instance.</param>
+        /// <param name="this">The AsyncControllerActionInvoker instance.</param>
         /// <param name="controllerContext">The ControllerContext for the current request.</param>
         /// <param name="actionName">The name of the controller action.</param>
         /// <param name="callback">An <see cref="AsyncCallback"/> delegate.</param>
         /// <param name="state">An object that holds the state of the async operation.</param>
         /// <returns>Returns the <see cref="IAsyncResult "/> returned by the original BeginInvokeAction() that is later passed to <see cref="EndInvokeAction"/>.</returns>
         public static object BeginInvokeAction(
-            dynamic asyncControllerActionInvoker,
+            dynamic @this,
             dynamic controllerContext,
             dynamic actionName,
             dynamic callback,
             dynamic state)
         {
+            // IAsyncResult System.Web.Mvc.Async.AsyncControllerActionInvoker.BeginInvokeAction(ControllerContext controllerContext, string actionName, AsyncCallback callback, object state)
             AspNetMvc5Integration integration = null;
 
             try
@@ -125,7 +126,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             try
             {
                 // call the original method, catching and rethrowing any unhandled exceptions
-                return asyncControllerActionInvoker.BeginInvokeAction(controllerContext, actionName, callback, state);
+                return @this.BeginInvokeAction(controllerContext, actionName, callback, state);
             }
             catch (Exception ex)
             {
@@ -137,11 +138,12 @@ namespace Datadog.Trace.ClrProfiler.Integrations
         /// <summary>
         /// Wrapper method used to instrument System.Web.Mvc.Async.AsyncControllerActionInvoker.EndInvokeAction().
         /// </summary>
-        /// <param name="asyncControllerActionInvoker">The AsyncControllerActionInvoker instance.</param>
+        /// <param name="this">The AsyncControllerActionInvoker instance.</param>
         /// <param name="asyncResult">The <see cref="IAsyncResult"/> returned by <see cref="BeginInvokeAction"/>.</param>
         /// <returns>Returns the <see cref="bool"/> returned by the original EndInvokeAction().</returns>
-        public static bool EndInvokeAction(dynamic asyncControllerActionInvoker, dynamic asyncResult)
+        public static bool EndInvokeAction(dynamic @this, dynamic asyncResult)
         {
+            // bool System.Web.Mvc.Async.AsyncControllerActionInvoker.EndInvokeAction(IAsyncResult asyncResult)
             AspNetMvc5Integration integration = null;
 
             try
@@ -159,7 +161,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             try
             {
                 // call the original method, catching and rethrowing any unhandled exceptions
-                return asyncControllerActionInvoker.EndInvokeAction(asyncResult);
+                return @this.EndInvokeAction(asyncResult);
             }
             catch (Exception ex)
             {
