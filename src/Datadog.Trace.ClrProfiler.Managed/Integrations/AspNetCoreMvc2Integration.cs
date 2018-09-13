@@ -190,7 +190,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             {
                 if (_httpContext != null)
                 {
-                    _scope?.Span?.SetTag("http.status_code", _httpContext.Response.StatusCode.ToString());
+                    _scope?.Span?.SetTag(Tags.HttpStatusCode, _httpContext.Response.StatusCode.ToString());
                 }
             }
             finally
