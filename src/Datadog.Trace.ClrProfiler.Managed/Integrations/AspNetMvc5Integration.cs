@@ -1,6 +1,7 @@
 #if NET45
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Web;
@@ -11,81 +12,10 @@ namespace Datadog.Trace.ClrProfiler.Integrations
     /// <summary>
     /// The ASP.NET MVC 5 integration.
     /// </summary>
-    internal sealed class AspNetMvc5Integration : IDisposable
+    public static class AspNetMvc5Integration
     {
-        private const string HttpContextKey = "__Datadog.Trace.ClrProfiler.Integrations.AspNetMvc5Integration";
+        private const string HttpContextKey = "__Datadog.Trace.ClrProfiler.Integrations." + nameof(AspNetMvc5Integration);
         private const string OperationName = "aspnet_mvc.request";
-
-        private static readonly Type ControllerContextType;
-
-        private readonly Scope _scope;
-
-        static AspNetMvc5Integration()
-        {
-            try
-            {
-                Assembly assembly = Assembly.Load("System.Web.Mvc");
-                ControllerContextType = assembly.GetType("System.Web.Mvc.ControllerContext", throwOnError: false);
-            }
-            catch
-            {
-                ControllerContextType = null;
-            }
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="AspNetMvc5Integration"/> class.
-        /// </summary>
-        /// <param name="controllerContextObj">The System.Web.Mvc.ControllerContext that was passed as an argument to the instrumented method.</param>
-        public AspNetMvc5Integration(object controllerContextObj)
-        {
-            try
-            {
-                if (controllerContextObj == null ||
-                    ControllerContextType == null ||
-                    controllerContextObj.GetType() != ControllerContextType)
-                {
-                    // bail out early
-                    return;
-                }
-
-                _scope = Tracer.Instance.StartActive(OperationName);
-                Span span = _scope.Span;
-                span.Type = SpanTypes.Web;
-
-                // access the controller context without referencing System.Web.Mvc directly
-                dynamic controllerContext = controllerContextObj;
-                span.SetTag(Tags.AspNetRoute, (string)controllerContext.RouteData.Route.Url);
-
-                HttpRequestBase request = (controllerContext.HttpContext as HttpContextBase)?.Request;
-
-                if (request != null)
-                {
-                    string url = request.RawUrl.ToLowerInvariant();
-                    span.SetTag(Tags.HttpUrl, url);
-
-                    string host = request.Headers.Get("Host");
-                    span.SetTag(Tags.HttpRequestHeadersHost, host);
-
-                    string httpMethod = request.HttpMethod.ToUpperInvariant();
-                    span.SetTag(Tags.HttpMethod, httpMethod);
-                }
-
-                IDictionary<string, object> routeValues = controllerContext.RouteData.Values;
-                string controllerName = (routeValues.GetValueOrDefault("controller") as string)?.ToSentenceCaseInvariant();
-                span.SetTag(Tags.AspNetController, controllerName);
-
-                string actionName = (routeValues.GetValueOrDefault("action") as string)?.ToSentenceCaseInvariant();
-                span.SetTag(Tags.AspNetAction, actionName);
-
-                string resourceName = $"{controllerName}.{actionName}";
-                span.ResourceName = resourceName;
-            }
-            catch
-            {
-                // TODO: logging
-            }
-        }
 
         /// <summary>
         /// Wrapper method used to instrument System.Web.Mvc.Async.AsyncControllerActionInvoker.BeginInvokeAction().
@@ -104,14 +34,16 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             dynamic state)
         {
             // IAsyncResult System.Web.Mvc.Async.AsyncControllerActionInvoker.BeginInvokeAction(ControllerContext controllerContext, string actionName, AsyncCallback callback, object state)
-            AspNetMvc5Integration integration = null;
+            Scope scope = null;
 
             try
             {
+                scope = Tracer.Instance.StartActive(OperationName);
+                UpdateSpan(scope.Span, controllerContext);
+
                 if (HttpContext.Current != null)
                 {
-                    integration = new AspNetMvc5Integration((object)controllerContext);
-                    HttpContext.Current.Items[HttpContextKey] = integration;
+                    HttpContext.Current.Items[HttpContextKey] = scope;
                 }
             }
             catch
@@ -126,7 +58,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             }
             catch (Exception ex)
             {
-                integration?.SetException(ex);
+                scope?.Span?.SetException(ex);
                 throw;
             }
         }
@@ -140,11 +72,11 @@ namespace Datadog.Trace.ClrProfiler.Integrations
         public static bool EndInvokeAction(dynamic @this, dynamic asyncResult)
         {
             // bool System.Web.Mvc.Async.AsyncControllerActionInvoker.EndInvokeAction(IAsyncResult asyncResult)
-            AspNetMvc5Integration integration = null;
+            Scope scope = null;
 
             try
             {
-                integration = HttpContext.Current?.Items[HttpContextKey] as AspNetMvc5Integration;
+                scope = HttpContext.Current?.Items[HttpContextKey] as Scope;
             }
             catch
             {
@@ -158,40 +90,53 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             }
             catch (Exception ex)
             {
-                integration?.SetException(ex);
+                scope?.Span?.SetException(ex);
                 throw;
             }
             finally
             {
-                integration?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Tags the current span as an error. Called when an unhandled exception is thrown in the instrumented method.
-        /// </summary>
-        /// <param name="ex">The exception that was thrown and not handled in the instrumented method.</param>
-        public void SetException(Exception ex)
-        {
-            _scope?.Span?.SetException(ex);
-        }
-
-        /// <summary>
-        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
-        /// </summary>
-        public void Dispose()
-        {
-            try
-            {
-                if (HttpContext.Current != null)
+                if (scope?.Span != null)
                 {
-                    _scope?.Span?.SetTag(Tags.HttpStatusCode, HttpContext.Current.Response.StatusCode.ToString());
+                    if (HttpContext.Current != null)
+                    {
+                        scope.Span.SetTag(Tags.HttpStatusCode, HttpContext.Current.Response.StatusCode.ToString());
+                    }
+
+                    scope.Span.Dispose();
                 }
             }
-            finally
+        }
+
+        private static void UpdateSpan(Span span, dynamic controllerContext)
+        {
+            span.Type = SpanTypes.Web;
+
+            // access the controller context without referencing System.Web.Mvc directly
+            span.SetTag(Tags.AspNetRoute, (string)controllerContext.RouteData.Route.Url);
+
+            HttpRequestBase request = (controllerContext.HttpContext as HttpContextBase)?.Request;
+
+            if (request != null)
             {
-                _scope?.Dispose();
+                string url = request.RawUrl.ToLowerInvariant();
+                span.SetTag(Tags.HttpUrl, url);
+
+                string host = request.Headers.Get("Host");
+                span.SetTag(Tags.HttpRequestHeadersHost, host);
+
+                string httpMethod = request.HttpMethod.ToUpperInvariant();
+                span.SetTag(Tags.HttpMethod, httpMethod);
             }
+
+            IDictionary<string, object> routeValues = controllerContext.RouteData.Values;
+            string controllerName = (routeValues.GetValueOrDefault("controller") as string)?.ToSentenceCaseInvariant();
+            span.SetTag(Tags.AspNetController, controllerName);
+
+            string actionName = (routeValues.GetValueOrDefault("action") as string)?.ToSentenceCaseInvariant();
+            span.SetTag(Tags.AspNetAction, actionName);
+
+            string resourceName = $"{controllerName}.{actionName}";
+            span.ResourceName = resourceName;
         }
     }
 }
