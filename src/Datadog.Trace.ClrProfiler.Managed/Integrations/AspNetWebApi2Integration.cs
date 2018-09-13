@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Datadog.Trace.ExtensionMethods;
@@ -20,50 +21,46 @@ namespace Datadog.Trace.ClrProfiler.Integrations
         /// </summary>
         /// <param name="this">The Api Controller</param>
         /// <param name="controllerContext">The controller context for the call</param>
-        /// <param name="cancellationTokenSource">The cancellation token source</param>
+        /// <param name="cancellationToken">The cancellation token</param>
         /// <returns>A task with the result</returns>
-        public static dynamic ExecuteAsync(dynamic @this, dynamic controllerContext, dynamic cancellationTokenSource)
+        public static async Task<HttpResponseMessage> ExecuteAsync(dynamic @this, dynamic controllerContext, CancellationToken cancellationToken)
         {
-            dynamic result;
+            // Task<HttpResponseMessage> System.Web.Http.Controllers.IHttpController.ExecuteAsync(HttpControllerContext controllerContext, CancellationToken cancellationToken)
+            Scope scope = null;
 
-            using (var scope = CreateScope(controllerContext))
+            try
             {
-                try
+                scope = CreateScope(controllerContext);
+            }
+            catch
+            {
+                // TODO: log this as an instrumentation error, but continue
+            }
+
+            HttpResponseMessage result;
+
+            try
+            {
+                // call the original method, catching and rethrowing any unhandled exceptions
+                result = await @this.ExecuteAsync(controllerContext, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                scope?.Span?.SetException(ex);
+                throw;
+            }
+
+            try
+            {
+                // some fields aren't set till after execution, so repopulate anything missing
+                if (scope?.Span != null)
                 {
-                    result = @this.ExecuteAsync(controllerContext, ((CancellationTokenSource)cancellationTokenSource).Token);
-                    if (result is Task task)
-                    {
-                        task.ContinueWith(
-                            t =>
-                            {
-                                if (t.IsFaulted)
-                                {
-                                    scope.Span.SetException(t.Exception);
-                                    scope.Span.Finish();
-                                }
-                                else if (t.IsCanceled)
-                                {
-                                    // abandon the span
-                                }
-                                else
-                                {
-                                    // some fields aren't set till after execution, so repopulate anything missing
-                                    UpdateSpan(controllerContext, scope.Span);
-                                    scope.Span.Finish();
-                                }
-                            });
-                    }
-                    else
-                    {
-                        scope.Span.Finish();
-                    }
+                    UpdateSpan(controllerContext, scope.Span);
                 }
-                catch (Exception ex)
-                {
-                    scope.Span.SetException(ex);
-                    scope.Span.Finish();
-                    throw;
-                }
+            }
+            catch
+            {
+                // TODO: log this as an instrumentation error, but continue
             }
 
             return result;
@@ -71,7 +68,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
 
         private static Scope CreateScope(dynamic controllerContext)
         {
-            var scope = Tracer.Instance.StartActive(OperationName, finishOnClose: false);
+            var scope = Tracer.Instance.StartActive(OperationName);
             UpdateSpan(controllerContext, scope.Span);
             return scope;
         }
