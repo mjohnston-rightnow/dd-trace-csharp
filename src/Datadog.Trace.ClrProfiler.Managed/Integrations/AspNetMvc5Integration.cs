@@ -18,7 +18,6 @@ namespace Datadog.Trace.ClrProfiler.Integrations
 
         private static readonly Type ControllerContextType;
 
-        private readonly HttpContextBase _httpContext;
         private readonly Scope _scope;
 
         static AspNetMvc5Integration()
@@ -50,37 +49,37 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                     return;
                 }
 
-                // access the controller context without referencing System.Web.Mvc directly
-                dynamic controllerContext = controllerContextObj;
-
-                _httpContext = controllerContext.HttpContext;
-
-                if (_httpContext == null)
-                {
-                    return;
-                }
-
-                string host = _httpContext.Request.Headers.Get("Host");
-                string httpMethod = _httpContext.Request.HttpMethod.ToUpperInvariant();
-                string url = _httpContext.Request.RawUrl.ToLowerInvariant();
-
-                IDictionary<string, object> routeValues = controllerContext.RouteData.Values;
-                string controllerName = routeValues.GetValueOrDefault("controller") as string;
-                string actionName = routeValues.GetValueOrDefault("action") as string;
-                string resourceName = $"{controllerName}.{actionName}";
-
                 _scope = Tracer.Instance.StartActive(OperationName);
                 Span span = _scope.Span;
                 span.Type = SpanTypes.Web;
-                span.ResourceName = resourceName;
-                span.SetTag(Tags.HttpRequestHeadersHost, host);
-                span.SetTag(Tags.HttpMethod, httpMethod);
-                span.SetTag(Tags.HttpUrl, url);
+
+                // access the controller context without referencing System.Web.Mvc directly
+                dynamic controllerContext = controllerContextObj;
                 span.SetTag(Tags.AspNetRoute, (string)controllerContext.RouteData.Route.Url);
+
+                HttpRequestBase request = (controllerContext.HttpContext as HttpContextBase)?.Request;
+
+                if (request != null)
+                {
+                    string url = request.RawUrl.ToLowerInvariant();
+                    span.SetTag(Tags.HttpUrl, url);
+
+                    string host = request.Headers.Get("Host");
+                    span.SetTag(Tags.HttpRequestHeadersHost, host);
+
+                    string httpMethod = request.HttpMethod.ToUpperInvariant();
+                    span.SetTag(Tags.HttpMethod, httpMethod);
+                }
+
+                IDictionary<string, object> routeValues = controllerContext.RouteData.Values;
+                string controllerName = (routeValues.GetValueOrDefault("controller") as string)?.ToSentenceCaseInvariant();
                 span.SetTag(Tags.AspNetController, controllerName);
+
+                string actionName = (routeValues.GetValueOrDefault("action") as string)?.ToSentenceCaseInvariant();
                 span.SetTag(Tags.AspNetAction, actionName);
 
-                _scope = Tracer.Instance.ActivateSpan(span, finishOnClose: true);
+                string resourceName = $"{controllerName}.{actionName}";
+                span.ResourceName = resourceName;
             }
             catch
             {
@@ -145,10 +144,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
 
             try
             {
-                if (HttpContext.Current != null)
-                {
-                    integration = HttpContext.Current?.Items[HttpContextKey] as AspNetMvc5Integration;
-                }
+                integration = HttpContext.Current?.Items[HttpContextKey] as AspNetMvc5Integration;
             }
             catch
             {
@@ -187,9 +183,9 @@ namespace Datadog.Trace.ClrProfiler.Integrations
         {
             try
             {
-                if (_httpContext != null)
+                if (HttpContext.Current != null)
                 {
-                    _scope?.Span?.SetTag("http.status_code", _httpContext.Response.StatusCode.ToString());
+                    _scope?.Span?.SetTag(Tags.HttpStatusCode, HttpContext.Current.Response.StatusCode.ToString());
                 }
             }
             finally
