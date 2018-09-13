@@ -55,7 +55,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                 // some fields aren't set till after execution, so repopulate anything missing
                 if (scope?.Span != null)
                 {
-                    UpdateSpan(controllerContext, scope.Span);
+                    UpdateSpan(scope.Span, controllerContext);
                 }
             }
             catch
@@ -69,11 +69,11 @@ namespace Datadog.Trace.ClrProfiler.Integrations
         private static Scope CreateScope(dynamic controllerContext)
         {
             var scope = Tracer.Instance.StartActive(OperationName);
-            UpdateSpan(controllerContext, scope.Span);
+            UpdateSpan(scope.Span, controllerContext);
             return scope;
         }
 
-        private static void UpdateSpan(dynamic controllerContext, Span span)
+        private static void UpdateSpan(Span span, dynamic controllerContext)
         {
             var req = controllerContext?.Request;
 
