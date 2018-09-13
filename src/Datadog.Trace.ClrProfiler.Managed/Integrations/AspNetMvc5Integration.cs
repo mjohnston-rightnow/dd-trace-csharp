@@ -40,16 +40,13 @@ namespace Datadog.Trace.ClrProfiler.Integrations
         /// <param name="controllerContextObj">The System.Web.Mvc.ControllerContext that was passed as an argument to the instrumented method.</param>
         public AspNetMvc5Integration(object controllerContextObj)
         {
-            if (controllerContextObj == null || ControllerContextType == null)
-            {
-                // bail out early
-                return;
-            }
-
             try
             {
-                if (controllerContextObj.GetType() != ControllerContextType)
+                if (controllerContextObj == null ||
+                    ControllerContextType == null ||
+                    controllerContextObj.GetType() != ControllerContextType)
                 {
+                    // bail out early
                     return;
                 }
 
