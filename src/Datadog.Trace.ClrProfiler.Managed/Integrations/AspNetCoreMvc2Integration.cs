@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Datadog.Trace.ExtensionMethods;
 
 namespace Datadog.Trace.ClrProfiler.Integrations
 {
@@ -138,7 +139,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
                 {
                     if (httpContext != null)
                     {
-                        scope.Span.SetTag(Tags.HttpStatusCode, httpContext.Response.StatusCode.ToString());
+                        scope.Span.SetTag(Tags.HttpStatusCode, ((int)httpContext.Response.StatusCode).ToString());
                     }
 
                     scope.Span.Dispose();
@@ -148,19 +149,22 @@ namespace Datadog.Trace.ClrProfiler.Integrations
 
         private static void UpdateSpan(Span span, dynamic actionDescriptor, dynamic httpContext)
         {
-            string controllerName = actionDescriptor.ControllerName;
-            string actionName = actionDescriptor.ActionName;
-            string resourceName = $"{controllerName}.{actionName}";
+            span.Type = SpanTypes.Web;
+
+            string url = httpContext.Request.GetDisplayUrl().ToLowerInvariant();
+            span.SetTag(Tags.HttpUrl, url);
 
             string httpMethod = httpContext.Request.Method.ToUpperInvariant();
-            string url = httpContext.Request.GetDisplayUrl().ToLowerInvariant();
-
-            span.Type = SpanTypes.Web;
-            span.ResourceName = resourceName;
             span.SetTag(Tags.HttpMethod, httpMethod);
-            span.SetTag(Tags.HttpUrl, url);
+
+            string controllerName = (actionDescriptor.ControllerName as string)?.ToSentenceCaseInvariant();
             span.SetTag(Tags.AspNetController, controllerName);
+
+            string actionName = (actionDescriptor.ActionName as string)?.ToSentenceCaseInvariant();
             span.SetTag(Tags.AspNetAction, actionName);
+
+            string resourceName = $"{controllerName}.{actionName}";
+            span.ResourceName = resourceName;
         }
     }
 }
