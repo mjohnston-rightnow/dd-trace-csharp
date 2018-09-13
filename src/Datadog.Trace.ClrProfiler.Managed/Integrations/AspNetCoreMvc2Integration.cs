@@ -7,49 +7,13 @@ namespace Datadog.Trace.ClrProfiler.Integrations
     /// <summary>
     /// The ASP.NET Core MVC 2 integration.
     /// </summary>
-    public sealed class AspNetCoreMvc2Integration : IDisposable
+    public static class AspNetCoreMvc2Integration
     {
         private const string HttpContextKey = "__Datadog.Trace.ClrProfiler.Integrations." + nameof(AspNetCoreMvc2Integration);
         private const string OperationName = "aspnet_core_mvc.request";
 
         private static Action<object, object, object, object> _beforeAction;
         private static Action<object, object, object, object> _afterAction;
-
-        private readonly dynamic _httpContext;
-        private readonly Scope _scope;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="AspNetCoreMvc2Integration"/> class.
-        /// </summary>
-        /// <param name="actionDescriptorObj">An ActionDescriptor with information about the current action.</param>
-        /// <param name="httpContextObj">The HttpContext for the current request.</param>
-        public AspNetCoreMvc2Integration(object actionDescriptorObj, object httpContextObj)
-        {
-            try
-            {
-                dynamic actionDescriptor = actionDescriptorObj;
-                string controllerName = actionDescriptor.ControllerName;
-                string actionName = actionDescriptor.ActionName;
-                string resourceName = $"{controllerName}.{actionName}";
-
-                _httpContext = httpContextObj;
-                string httpMethod = _httpContext.Request.Method.ToUpperInvariant();
-                string url = _httpContext.Request.GetDisplayUrl().ToLowerInvariant();
-
-                _scope = Tracer.Instance.StartActive(OperationName);
-                Span span = _scope.Span;
-                span.Type = SpanTypes.Web;
-                span.ResourceName = resourceName;
-                span.SetTag(Tags.HttpMethod, httpMethod);
-                span.SetTag(Tags.HttpUrl, url);
-                span.SetTag(Tags.AspNetController, controllerName);
-                span.SetTag(Tags.AspNetAction, actionName);
-            }
-            catch
-            {
-                // TODO: logging
-            }
-        }
 
         /// <summary>
         /// Wrapper method used to instrument Microsoft.AspNetCore.Mvc.Internal.MvcCoreDiagnosticSourceExtensions.BeforeAction()
@@ -60,17 +24,19 @@ namespace Datadog.Trace.ClrProfiler.Integrations
         /// <param name="routeData">A RouteData with information about the current route.</param>
         public static void BeforeAction(
             object diagnosticSource,
-            object actionDescriptor,
+            dynamic actionDescriptor,
             dynamic httpContext,
             object routeData)
         {
-            AspNetCoreMvc2Integration integration = null;
+            Scope scope = null;
 
             try
             {
-                integration = new AspNetCoreMvc2Integration(actionDescriptor, httpContext);
+                scope = Tracer.Instance.StartActive(OperationName);
+                UpdateSpan(scope.Span, actionDescriptor, httpContext);
+
                 IDictionary<object, object> contextItems = httpContext.Items;
-                contextItems[HttpContextKey] = integration;
+                contextItems[HttpContextKey] = scope;
             }
             catch
             {
@@ -105,7 +71,7 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             }
             catch (Exception ex)
             {
-                integration?.SetException(ex);
+                scope?.Span?.SetException(ex);
                 throw;
             }
         }
@@ -123,12 +89,12 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             dynamic httpContext,
             object routeData)
         {
-            AspNetCoreMvc2Integration integration = null;
+            Scope scope = null;
 
             try
             {
                 IDictionary<object, object> contextItems = httpContext?.Items;
-                integration = contextItems?[HttpContextKey] as AspNetCoreMvc2Integration;
+                scope = contextItems?[HttpContextKey] as Scope;
             }
             catch
             {
@@ -163,40 +129,38 @@ namespace Datadog.Trace.ClrProfiler.Integrations
             }
             catch (Exception ex)
             {
-                integration?.SetException(ex);
+                scope?.Span?.SetException(ex);
                 throw;
             }
             finally
             {
-                integration?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Tags the current span as an error. Called when an unhandled exception is thrown in the instrumented method.
-        /// </summary>
-        /// <param name="ex">The exception that was thrown and not handled in the instrumented method.</param>
-        public void SetException(Exception ex)
-        {
-            _scope?.Span?.SetException(ex);
-        }
-
-        /// <summary>
-        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
-        /// </summary>
-        public void Dispose()
-        {
-            try
-            {
-                if (_httpContext != null)
+                if (scope?.Span != null)
                 {
-                    _scope?.Span?.SetTag(Tags.HttpStatusCode, _httpContext.Response.StatusCode.ToString());
+                    if (httpContext != null)
+                    {
+                        scope.Span.SetTag(Tags.HttpStatusCode, httpContext.Response.StatusCode.ToString());
+                    }
+
+                    scope.Span.Dispose();
                 }
             }
-            finally
-            {
-                _scope?.Dispose();
-            }
+        }
+
+        private static void UpdateSpan(Span span, dynamic actionDescriptor, dynamic httpContext)
+        {
+            string controllerName = actionDescriptor.ControllerName;
+            string actionName = actionDescriptor.ActionName;
+            string resourceName = $"{controllerName}.{actionName}";
+
+            string httpMethod = httpContext.Request.Method.ToUpperInvariant();
+            string url = httpContext.Request.GetDisplayUrl().ToLowerInvariant();
+
+            span.Type = SpanTypes.Web;
+            span.ResourceName = resourceName;
+            span.SetTag(Tags.HttpMethod, httpMethod);
+            span.SetTag(Tags.HttpUrl, url);
+            span.SetTag(Tags.AspNetController, controllerName);
+            span.SetTag(Tags.AspNetAction, actionName);
         }
     }
 }
